@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <link rel="stylesheet" type="text/css" href="https://raw.githubusercontent.com/jkghub/covid-jmk-test/master/covid_deaths.css">
+    <title>PROJECT TITLE</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://d3js.org/d3.v4.js"></script>
+    <script src="https://unpkg.com/d3-simple-slider"></script>
+  </head>
+
+<body>
+  <header>
+    <h2>Covid-19 Deaths</h2>
+    Comparing predictions to reality
+  </header>
+
+  <section>
+    <nav>
+      <div class="pagination">
+        <a id = "pL" href="covid_deaths.html?page=1">&laquo;</a>
+        <a id = "p1" class="passive" href="covid_deaths.html?page=1">1</a>
+        <a id = "p2" class="passive" href="covid_deaths.html?page=2">2</a>
+        <a id = "p3" class="passive" href="covid_deaths.html?page=3">3</a>
+        <a id = "p4" class="passive" href="covid_deaths.html?page=4">4</a>
+        <a id = "p5" class="passive" href="covid_deaths.html?page=5">5</a>
+        <a id = "pR" href="covid_deaths.html?page=1">&raquo;</a>
+      </div>
+      <div id = "explanatory_text">Some stuff</div>
+    </nav>
+
+    <div id="my_dataviz"></div>
+    <div style='padding-left: 200px;' id="slider"></div>
+
+
+    <script>
+
+      function update_page(page_id){
+        document.getElementById("p".concat(page_id)).setAttribute("class", "active");
+        document.getElementById("pL").setAttribute("href", "covid_deaths.html?page=".concat(Math.max(parseInt(page_id) - 1, 1)))
+        document.getElementById("pR").setAttribute("href", "covid_deaths.html?page=".concat(Math.min(parseInt(page_id) + 1, 5)))
+      }
+
+      // Page-specific parameters
+      const urlParams = new URLSearchParams(window.location.search);
+      const page = urlParams.get('page')
+      if(page == 1){
+        threshhold_date = new Date(2020,10,1);
+        var circleData = [];
+        document.getElementById("explanatory_text").innerHTML = "Total Covid-19 deaths have increased steadily over the past several months, but predictions from the best machine learning models have not always matched reality."
+      } else if(page == 2){
+        threshhold_date = new Date(2020,4,24);
+        var circleData = [
+           { "cx": 305, "cy": 140, "radius": 10, "color" : "black", "fill" : "none", "width" : 3, "message" : "April 12 prediction"}];
+        document.getElementById("explanatory_text").innerHTML = "Initially, insufficient data lead to predictions that were quite inaccurate."
+      } else if(page == 3){
+        threshhold_date = new Date(2020,4,24);
+        var circleData = [
+           { "cx": 305, "cy": 250, "radius": 10, "color" : "black", "fill" : "none", "width" : 3, "message" : "April 26 prediction"}];
+       document.getElementById("explanatory_text").innerHTML = "Predictions improved with more data, but still differed from actual values."
+      } else if(page == 4){
+        threshhold_date = new Date(2020,7,2);
+        var circleData = [
+           { "cx": 580, "cy":  45, "radius": 10, "color" : "black", "fill" : "none", "width" : 3, "message" : "July 5 prediction"}];
+       document.getElementById("explanatory_text").innerHTML = "Much later, the substantial increase in available data meant that predictions closely matched actual values. Here is one outlier, where the model trained at the beginning of July did not predict the substantial increase in cases that would occur by August."
+      } else {
+        threshhold_date = new Date(2020,10,1);
+        var circleData = [];
+        document.getElementById("explanatory_text").innerHTML = "Now you try. Set the date threshold."
+      }
+
+      if(page != 5){
+        element = document.getElementById("slider");
+        element.parentNode.removeChild(element);
+      }
+      update_page(page)
+
+      // Add the SVG object.
+      var margin = {top: 10, right: 30, bottom: 20, left: 50},
+        width = 660 - margin.left - margin.right,
+        height = 600 - margin.top - margin.bottom;
+      var svg = d3.select("#my_dataviz")
+        .append("svg")
+          .attr("width", width + margin.left + margin.right)
+          .attr("height", height + margin.top + margin.bottom)
+        .append("g")
+          .attr("transform",
+                "translate(" + margin.left + "," + margin.top + ")");
+      // This is another object for the annotations.
+      var svg2 = svg.append("g");
+
+      // Main function.
+      function plot(cutoffDate){
+        d3.csv("https://raw.githubusercontent.com/jkghub/covid-jmk-test/master/truth-Cumulative-Deaths.csv",
+          function(d){return { date : d3.timeParse("%Y-%m-%d")(d.date), value : d.value }},
+
+          function(data) {
+            svg.selectAll("path").remove();
+
+            // Filter actual death counts by date.
+            data = data.filter(function(d) {
+              return d.date > new Date(2020,2,15) & d.date < cutoffDate;
+            })
+
+            // Create axes.
+            var x = d3.scaleTime()
+              .domain([new Date(2020,2,7), new Date(2020,7,1)])
+              .range([ 0, width ]);
+            svg.append("g")
+              .attr("transform", "translate(0," + height + ")")
+              .call(d3.axisBottom(x));
+            var y = d3.scaleLinear()
+              .domain([0, 160000])
+              .range([ height, 0 ]);
+            svg.append("g")
+              .call(d3.axisLeft(y));
+
+            // Add line for actual deaths.
+            svg.append("path")
+              .datum(data)
+              .attr("fill", "none")
+              .attr("stroke", "steelblue")
+              .attr("stroke-width", 4)
+              .attr("d", d3.line()
+                .x(function(d) { return x(d.date) })
+                .y(function(d) { return y(d.value) })
+                )
+
+            // Add the annotations.
+            svg2.selectAll("circle").remove();
+            svg2.selectAll("text").remove();
+            svg2.selectAll("line").remove();
+            var circles = svg2.selectAll("circle")
+              .data(circleData).enter().append("circle")
+              .attr("cx", function (d) { return d.cx; })
+              .attr("cy", function (d) { return d.cy; })
+              .attr("r", function (d) { return d.radius; })
+              .style("stroke", function (d) { return d.color; })
+              .style("stroke-width", function (d) { return d.width; })
+              .style("fill", function (d) { return d.fill; });
+            var text = svg2.selectAll("text")
+              .data(circleData).enter().append("text")
+              .attr("text-anchor", "end")
+              .attr("x", function(d) { return d.cx - 125; })
+              .attr("y", function(d) { return d.cy + 6; })
+              .text( function (d) { return d.message; })
+              .attr("font-family", "sans-serif")
+              .attr("font-size", "20px")
+              .attr("fill", "black");
+            var line = svg2.selectAll("line")
+              .data(circleData).enter().append("line")
+              .attr("x1", function (d) { return d.cx - 10; })
+              .attr("y1", function (d) { return d.cy; })
+              .attr("x2", function (d) { return d.cx - 120; })
+              .attr("y2", function (d) { return d.cy; })
+              .attr("stroke-width", 2)
+              .attr("stroke", "black");
+
+
+            d3.csv("https://raw.githubusercontent.com/jkghub/covid-jmk-test/master/truth-Predicted-Deaths.csv",
+              function(d){
+                return { forecast_date : d3.timeParse("%Y-%m-%d")(d.forecast_date),
+                         target_date   : d3.timeParse("%Y-%m-%d")(d.target_end_date),
+                         value : d.value,
+                         group : d.z}
+              },
+              function(data) {
+                for (i = 1; i < 16; i++) {
+                  if(page != 1){
+                    if(i == 1){
+                      col_val = "#FF0000";
+                    } else if(i == 2){
+                      col_val = "#00FF00";
+                    } else if(i == 12){
+                      col_val = "#FF3399";
+                    } else {
+                      col_val = "#aaa";
+                    }
+                    pred_data = data.filter(function(d) {
+                      return d.group == i & d.target_date < cutoffDate;
+                    })
+                    // Add line
+                    svg.append("path")
+                      .datum(pred_data)
+                      .attr("fill", "none")
+                      .attr("stroke", col_val)
+                      .attr("stroke-width", 2.5)
+                      .attr("d", d3.line()
+                        .x(function(d) { return x(d.target_date) })
+                        .y(function(d) { return y(d.value) })
+                        )
+                    }
+                  }
+            })
+
+    })
+
+
+  }
+  plot(threshhold_date);
+
+
+
+
+
+  var dataTime = d3.range(0, 20).map(function(d) {
+      return new Date(2020, 2, 22 + d*7);
+    });
+
+    var sliderTime = d3
+      .sliderBottom()
+      .min(d3.min(dataTime))
+      .max(d3.max(dataTime))
+      .step(1000 * 60 * 60 * 24 * 7)
+      .width(800)
+      .tickFormat(d3.timeFormat('%m-%d'))
+      .tickValues(dataTime)
+      .default(new Date(2020, 0, 22))
+      .on('onchange', val => {
+        //d3.select('p#value-time').text(d3.timeFormat('%Y')(val));
+        plot(val);
+      });
+
+    var gTime = d3
+      .select('div#slider')
+      .append('svg')
+      .attr('width', 1000)
+      .attr('height', 100)
+      .append('g')
+      .attr('transform', 'translate(30,30)');
+
+    gTime.call(sliderTime);
+
+    d3.select('p#value-time').text(d3.timeFormat('%Y')(sliderTime.value()));
+
+  </script>
+
+  </section>
+
+  <footer>
+    <p>Jeffrey Kuhn, 2020/08/02</p>
+  </footer>
+
+  </body>
+
+
+  </html>
